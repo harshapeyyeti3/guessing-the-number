@@ -1,107 +1,99 @@
 #include <stdio.h>
 
-struct Book {
-    char title[50];
-    char author[50];
-    char isbn[20];
-    char genre[20];
-    float price;
-    int year;
-    int available; // 1 = available, 0 = borrowed
-};
-
-void printBook(struct Book b) {
-    printf("Title       : %s\n", b.title);
-    printf("Author      : %s\n", b.author);
-    printf("ISBN        : %s\n", b.isbn);
-    printf("Genre       : %s\n", b.genre);
-    printf("Price       : %.2f\n", b.price);
-    printf("Year        : %d\n", b.year);
-    printf("Availability: %s\n", b.available ? "Available" : "Borrowed");
+void splitDigits(int n, int d[3]) {
+    // assumes n is a 3-digit non-negative number
+    d[2] = n % 10; n /= 10;
+    d[1] = n % 10; n /= 10;
+    d[0] = n % 10;
 }
 
-int countAvailable(struct Book books[], int n) {
-    int count = 0;
-    for (int i = 0; i < n; i++) {
-        if (books[i].available == 1)
-            count++;
+// returns wrong-position count; also fills correctPos by reference
+int countMatches(int secret, int guess, int *correctPos) {
+    int s[3], g[3];
+    splitDigits(secret, s);
+    splitDigits(guess, g);
+
+    // mark matched positions
+    int usedSecret[3] = {0,0,0}; // 1 if that secret digit already matched (correct-pos or used)
+    int usedGuess[3]  = {0,0,0};
+
+    *correctPos = 0;
+    // 1) correct-position matches
+    for (int i = 0; i < 3; i++) {
+        if (s[i] == g[i]) {
+            (*correctPos)++;
+            usedSecret[i] = 1;
+            usedGuess[i] = 1;
+        }
     }
-    return count;
-}
 
-float averagePrice(struct Book books[], int n) {
-    float sum = 0.0f;
-    for (int i = 0; i < n; i++)
-        sum += books[i].price;
-
-    return (n == 0) ? 0 : sum / n;
-}
-
-int indexOfNewest(struct Book books[], int n) {
-    if (n == 0) return -1;
-
-    int newestIndex = 0;
-    for (int i = 1; i < n; i++) {
-        if (books[i].year > books[newestIndex].year)
-            newestIndex = i;
+    // 2) build frequency of remaining secret digits (0..9)
+    int freq[10] = {0};
+    for (int i = 0; i < 3; i++) {
+        if (!usedSecret[i]) {
+            int digit = s[i];
+            freq[digit]++;
+        }
     }
-    return newestIndex;
+
+    // 3) count wrong-position matches by checking unmatched guess digits against freq
+    int wrongPos = 0;
+    for (int i = 0; i < 3; i++) {
+        if (!usedGuess[i]) {
+            int digit = g[i];
+            if (freq[digit] > 0) {
+                wrongPos++;
+                freq[digit]--; // consume that secret digit
+            }
+        }
+    }
+
+    return wrongPos;
 }
 
 int main(void) {
-    int n;
+    int secret1, secret2;
+    int guess;
 
-    printf("Enter number of books: ");
-    scanf("%d", &n);
+    printf("Player 1, enter your secret 3-digit number: ");
+    scanf("%d", &secret1);
 
-    struct Book books[n];
+    printf("Player 2, enter your secret 3-digit number: ");
+    scanf("%d", &secret2);
 
-    printf("\n--- Enter Book Details ---\n");
+    int p1Done = 0, p2Done = 0;
+    while (!(p1Done && p2Done)) {
+        // Player 2 guesses Player 1's number
+        if (!p1Done) {
+            printf("\nPlayer 2, guess Player 1's number: ");
+            scanf("%d", &guess);
 
-    for (int i = 0; i < n; i++) {
-        printf("\nBook %d:\n", i + 1);
+            if (guess == secret1) {
+                printf("Correct guess by Player 2!\n");
+                p1Done = 1;
+            } else {
+                int correctPos = 0;
+                int wrongPos = countMatches(secret1, guess, &correctPos);
+                printf("%d correct-position, %d wrong-position matches.\n", correctPos, wrongPos);
+            }
+        }
 
-        printf("Enter Title: ");
-        scanf(" %[^\n]", books[i].title);   // reads full string with spaces
+        // Player 1 guesses Player 2's number
+        if (!p2Done) {
+            printf("\nPlayer 1, guess Player 2's number: ");
+            scanf("%d", &guess);
 
-        printf("Enter Author: ");
-        scanf(" %[^\n]", books[i].author);
-
-        printf("Enter ISBN: ");
-        scanf(" %s", books[i].isbn);
-
-        printf("Enter Genre: ");
-        scanf(" %[^\n]", books[i].genre);
-
-        printf("Enter Price: ");
-        scanf("%f", &books[i].price);
-
-        printf("Enter Publication Year: ");
-        scanf("%d", &books[i].year);
-
-        printf("Enter Availability (1 = available, 0 = borrowed): ");
-        scanf("%d", &books[i].available);
+            if (guess == secret2) {
+                printf("Correct guess by Player 1!\n");
+                p2Done = 1;
+            } else {
+                int correctPos = 0;
+                int wrongPos = countMatches(secret2, guess, &correctPos);
+                printf("%d correct-position, %d wrong-position matches.\n", correctPos, wrongPos);
+            }
+        }
     }
 
-    printf("\n=== List of Books ===\n\n");
-    for (int i = 0; i < n; i++) {
-        printf("Book %d:\n", i + 1);
-        printBook(books[i]);
-        printf("\n");
-    }
-
-    int availableCount = countAvailable(books, n);
-    float avgPrice = averagePrice(books, n);
-    int newestIndex = indexOfNewest(books, n);
-
-    printf("Total books     : %d\n", n);
-    printf("Available books : %d\n", availableCount);
-    printf("Average price   : %.2f\n", avgPrice);
-
-    if (newestIndex != -1) {
-        printf("\n=== Newest Book ===\n");
-        printBook(books[newestIndex]);
-    }
-
+    printf("\nBoth players guessed correctly! Game over.\n");
     return 0;
 }
